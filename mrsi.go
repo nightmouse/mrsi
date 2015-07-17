@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"runtime"
 	"time"
-	"github.com/nightmouse/mrsi/urlrandomizer"
 )
 
 type result struct {
@@ -67,28 +66,46 @@ func TrapSigInt(quitChan chan bool) {
 	}()
 }
 
-
-var seed = flag.Int("s", 0, "random seed number")
 var workerCount = flag.Int("n", 4, "number of worker threads each requesting the url")
 var requestCount = flag.Int("r", 1024, "total number of requests")
-
-// mrsi -s 348547 -n 8 -r 100000000 --intchoice --key "{{i1}}" --min 0 --max 1000  --stringchoice --key "{{s1}}" --choices "items,users" "http://localhost:8080/{{s1}}/{{i1}}/"
 
 func main() {
 	flag.Parse()
 
 	quitChan := make(chan bool)
+	jobChan := make(chan *url.URL)
 	resultChan := make(chan result)
 
 	TrapSigInt(quitChan)
 
-    randomizer := urlrandomizer.NewUrlRandomizer(seed, flag.Args(), intChoices, stringChoices)
-	jobChan := randomizer.GetChannel(*requestCount, quitChan)
+	// parse the urls
+	urls := make([]*url.URL, flag.NArg())
+	for i := 0; i != flag.NArg(); i++ {
+		u, err := url.Parse(flag.Arg(i))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		urls[i] = u
+	}
 
 	// start workers
 	for i := 0; i != (*workerCount); i++ {
 		go worker(jobChan, resultChan)
 	}
+
+	// distribute the jobs
+	go func() {
+		for i := 0; i != (*requestCount); i++ {
+			select {
+			case <-quitChan:
+				break
+			default:
+				jobChan <- urls[i%len(urls)]
+			}
+		}
+		close(jobChan)
+	}()
 
 	// wait for results
 	totalTime := 0.0
