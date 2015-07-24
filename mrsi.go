@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/nightmouse/mrsi/urlrandomizer"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -13,7 +14,6 @@ import (
 	"os/signal"
 	"runtime"
 	"time"
-	"github.com/nightmouse/mrsi/urlrandomizer"
 )
 
 type result struct {
@@ -67,22 +67,63 @@ func TrapSigInt(quitChan chan bool) {
 	}()
 }
 
-
-var seed = flag.Int("s", 0, "random seed number")
-var workerCount = flag.Int("n", 4, "number of worker threads each requesting the url")
-var requestCount = flag.Int("r", 1024, "total number of requests")
-
-// mrsi -s 348547 -n 8 -r 100000000 --intchoice --key "{{i1}}" --min 0 --max 1000  --stringchoice --key "{{s1}}" --choices "items,users" "http://localhost:8080/{{s1}}/{{i1}}/"
-
 func main() {
+	seed := flag.Int64("s", 0, "random seed number")
+	workerCount := flag.Int("n", 4, "number of worker threads each requesting the url")
+	requestCount := flag.Int("r", 1024, "total number of requests")
+
+	intValFlag := flag.NewFlagSet("intval", flag.ExitOnError)
+	intKey := intValFlag.String("key", "", "a token to replace in the url")
+	intMin := intValFlag.Int64("min", 0, "minimum number in a random range")
+	intMax := intValFlag.Int64("max", 0, "maximum number in a random range")
+
+	strValFlag := flag.NewFlagSet("strchoice", flag.ExitOnError)
+	strKey := strValFlag.String("key", "", "a token to replace in the url")
+	strVal := strValFlag.String("values", "", "a comma delimited set of strings")
+
+	intVals := make([]*urlrandomizer.IntVal, 0)
+	strVals := make([]*urlrandomizer.StringVal, 0)
+
 	flag.Parse()
+	args := flag.Args()
+	lastIndex := 0
+	for i, v := range args {
+		lastIndex = i
+		switch v {
+		case "intval":
+			if err := intValFlag.Parse(args[i+1:]); err == nil {
+				tmp, err := urlrandomizer.NewIntVal(*intKey, *intMin, *intMax)
+				if err != nil {
+					fmt.Println("unable to parse flags for intval: ", err)
+					os.Exit(1)
+				}
+				intVals = append(intVals, tmp)
+
+			} else {
+				fmt.Println("unable to parse flags for intval: ", err)
+				os.Exit(1)
+			}
+		case "strval":
+			if err := strValFlag.Parse(args[i+1:]); err == nil {
+				sv, err := urlrandomizer.NewStringVal(*strKey, *strVal)
+				if err != nil {
+					fmt.Println("unable to parse flags for intval: ", err)
+					os.Exit(1)
+				}
+				strVals = append(strVals, sv)
+			} else {
+				fmt.Println("unable to parse flags for strval: ", err)
+				os.Exit(1)
+			}
+		}
+	}
 
 	quitChan := make(chan bool)
 	resultChan := make(chan result)
 
 	TrapSigInt(quitChan)
 
-    randomizer := urlrandomizer.NewUrlRandomizer(seed, flag.Args(), intChoices, stringChoices)
+	randomizer := urlrandomizer.NewURLRandomizer(*seed, args[lastIndex:], intVals, strVals)
 	jobChan := randomizer.GetChannel(*requestCount, quitChan)
 
 	// start workers
@@ -107,4 +148,5 @@ func main() {
 		}
 	}
 	fmt.Printf("%d requests %d errors %d byes %f seconds\n", totalResults, totalErrors, totalBytes, totalTime)
+	os.Exit(0)
 }
