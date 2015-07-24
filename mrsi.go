@@ -1,5 +1,3 @@
-// https://en.wikipedia.org/wiki/Artillery#MRSI
-
 package main
 
 import (
