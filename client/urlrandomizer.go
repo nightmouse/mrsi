@@ -12,8 +12,8 @@ import (
 
 type IntVal struct {
 	Key string `json: "key"`
-	Min int64 `json: "min"`
-	Max int64 `json: "max"`
+	Min int64  `json: "min"`
+	Max int64  `json: "max"`
 }
 
 func NewIntVal(key string, min, max int64) (*IntVal, error) {
@@ -24,8 +24,8 @@ func NewIntVal(key string, min, max int64) (*IntVal, error) {
 }
 
 type StringVal struct {
-	Key  string      `json: "key"`
-	Vals []string    `json: "values"`
+	Key  string   `json: "key"`
+	Vals []string `json: "values"`
 }
 
 func NewStringVal(key, vals string) (*StringVal, error) {
@@ -37,10 +37,10 @@ func NewStringVal(key, vals string) (*StringVal, error) {
 }
 
 type URLRandomizer struct {
-	Seed       int64         `json: "seed, omitempty"`
-	Urls       []string      `json: "urls"`
-	IntVals    []*IntVal     `json: "intvals"`
-	StringVals []*StringVal  `json: "stringvals"`
+	Seed       int64        `json: "seed, omitempty"`
+	Urls       []string     `json: "urls"`
+	IntVals    []*IntVal    `json: "intvals"`
+	StringVals []*StringVal `json: "stringvals"`
 }
 
 func NewURLRandomizer(seed int64, urls []string, intRanges []*IntVal, stringVals []*StringVal) *URLRandomizer {
