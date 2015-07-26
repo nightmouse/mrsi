@@ -62,7 +62,7 @@ func initJson(c *cli.Context) {
 		fmt.Println("error encoding json: ", err)
 		os.Exit(1)
 	}
-	err := ioutil.WriteFile(fileName, bytes, 0644)
+	err = ioutil.WriteFile(fileName, bytes, 0644)
 	if err != nil {
 		fmt.Println("error saving json to ", fileName, ": ", err)
 		os.Exit(1)
