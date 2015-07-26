@@ -1,71 +1,86 @@
 package main
 
 import (
-	"errors"
-	"flag"
 	"fmt"
-	"github.com/nightmouse/mrsi/urlrandomizer"
-	"io/ioutil"
-	"net/http"
-	"net/url"
+	"github.com/nightmouse/mrsi/client"
 	"os"
-	"os/signal"
 	"runtime"
-	"time"
+    "github.com/codegangsta/cli"
+    "encoding/json"
 )
 
-type result struct {
-	Duration time.Duration
-	Bytes    int64
-	Err      error
-}
-
-func worker(jobs chan *url.URL, results chan result) {
-	for {
-		select {
-		case url, ok := <-jobs:
-			if !ok {
-				return
-			}
-
-			start := time.Now()
-			resp, err := http.Get(url.String())
-
-			if err != nil {
-				results <- result{Err: err}
-				continue
-			}
-
-			defer resp.Body.Close()
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				err = errors.New("Server returned " + resp.Status)
-				results <- result{Err: err}
-				continue
-			}
-
-			bytes, _ := ioutil.ReadAll(resp.Body)
-			end := time.Now()
-			results <- result{Duration: end.Sub(start), Bytes: int64(len(bytes))}
-			fmt.Println("finished: ", url, " ", len(bytes))
-		}
-	}
-}
 
 func Init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
-func TrapSigInt(quitChan chan bool) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		<-c
-		quitChan <- true
-		return
-	}()
+func runJson(c *cli.Context) {
+    fmt.Println("runJson: ", c.Args())
+    if len(c.Args()) != 1 { 
+        fmt.Println("error: expecting one argument")
+        os.Exit(1)
+    }
+
+    fileName := c.Args()[0]
+    fd, err := os.Open(fileName)
+    defer fd.Close()
+    if err != nil { 
+        fmt.Println("unable to open ", fileName, ": ", err)
+        os.Exit(1)
+    }
+
+    runConf := &client.RunConf{}
+    dec := json.NewDecoder(fd)
+    err = dec.Decode(runConf)
+    if err != nil { 
+        fmt.Println("error parsing json in ", fileName, ": ", err)
+        os.Exit(1)
+    }
+    runConf.Exec()
+}
+
+func initJson(c *cli.Context) { 
+    if len(c.Args()) != 1 { 
+        fmt.Println("error: expecting one argument")
+        os.Exit(1)
+    }
+
+	fileName := c.Args()[0]
+	fd, err := os.Create(fileName)
+	defer fd.Close()
+	if err != nil { 
+		fmt.Println("error initialing ", fileName, ": ", err)
+		os.Exit(1)
+	}
+
+	enc := json.NewEncoder(fd)
+	enc.Encode(client.RunConf{})
+
+	os.Exit(0)
 }
 
 func main() {
+    app := cli.NewApp()
+    app.Name = "mrsi"
+    app.Usage = "benchmarks http servers with configurable urls"
+    //app.Action = exec
+    app.Commands = []cli.Command{ 
+        {
+            Name: "run",
+            Usage: "Run jobs defined in a .json file",
+            Action: runJson,
+        },
+        {
+            Name: "init",
+            Usage: "Intialize a json file with an test profile",
+            Action: initJson,
+        },
+    }
+
+    
+    app.Run(os.Args)
+
+/*
 	seed := flag.Int64("s", 0, "random seed number")
 	workerCount := flag.Int("n", 4, "number of worker threads each requesting the url")
 	requestCount := flag.Int("r", 1024, "total number of requests")
@@ -79,8 +94,8 @@ func main() {
 	strKey := strValFlag.String("key", "", "a token to replace in the url")
 	strVal := strValFlag.String("values", "", "a comma delimited set of strings")
 
-	intVals := make([]*urlrandomizer.IntVal, 0)
-	strVals := make([]*urlrandomizer.StringVal, 0)
+	intVals := make([]*client.IntVal, 0)
+	strVals := make([]*client.StringVal, 0)
 
 	flag.Parse()
 	args := flag.Args()
@@ -90,7 +105,7 @@ func main() {
 		switch v {
 		case "intval":
 			if err := intValFlag.Parse(args[i+1:]); err == nil {
-				tmp, err := urlrandomizer.NewIntVal(*intKey, *intMin, *intMax)
+				tmp, err := client.NewIntVal(*intKey, *intMin, *intMax)
 				if err != nil {
 					fmt.Println("unable to parse flags for intval: ", err)
 					os.Exit(1)
@@ -103,7 +118,7 @@ func main() {
 			}
 		case "strval":
 			if err := strValFlag.Parse(args[i+1:]); err == nil {
-				sv, err := urlrandomizer.NewStringVal(*strKey, *strVal)
+				sv, err := client.NewStringVal(*strKey, *strVal)
 				if err != nil {
 					fmt.Println("unable to parse flags for intval: ", err)
 					os.Exit(1)
@@ -115,36 +130,5 @@ func main() {
 			}
 		}
 	}
-
-	quitChan := make(chan bool)
-	resultChan := make(chan result)
-
-	TrapSigInt(quitChan)
-
-	randomizer := urlrandomizer.NewURLRandomizer(*seed, args[lastIndex:], intVals, strVals)
-	jobChan := randomizer.GetChannel(*requestCount, quitChan)
-
-	// start workers
-	for i := 0; i != (*workerCount); i++ {
-		go worker(jobChan, resultChan)
-	}
-
-	// wait for results
-	totalTime := 0.0
-	totalBytes := int64(0)
-	totalErrors := 0
-	var totalResults int
-	for totalResults = 0; totalResults < (*requestCount); totalResults++ {
-		r := <-resultChan
-		totalResults++
-		if r.Err != nil {
-			totalErrors++
-			fmt.Println(r.Err)
-		} else {
-			totalTime += r.Duration.Seconds()
-			totalBytes += r.Bytes
-		}
-	}
-	fmt.Printf("%d requests %d errors %d byes %f seconds\n", totalResults, totalErrors, totalBytes, totalTime)
-	os.Exit(0)
+*/
 }

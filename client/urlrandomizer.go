@@ -1,4 +1,4 @@
-package urlrandomizer
+package client
 
 import (
 	"errors"
@@ -11,9 +11,9 @@ import (
 )
 
 type IntVal struct {
-	Key string
-	Min int64
-	Max int64
+	Key string `json: "key"`
+	Min int64 `json: "min"`
+	Max int64 `json: "max"`
 }
 
 func NewIntVal(key string, min, max int64) (*IntVal, error) {
@@ -24,8 +24,8 @@ func NewIntVal(key string, min, max int64) (*IntVal, error) {
 }
 
 type StringVal struct {
-	Key  string
-	Vals []string
+	Key  string      `json: "key"`
+	Vals []string    `json: "values"`
 }
 
 func NewStringVal(key, vals string) (*StringVal, error) {
@@ -37,10 +37,10 @@ func NewStringVal(key, vals string) (*StringVal, error) {
 }
 
 type URLRandomizer struct {
-	Seed       int64
-	Urls       []string
-	IntVals    []*IntVal
-	StringVals []*StringVal
+	Seed       int64         `json: "seed, omitempty"`
+	Urls       []string      `json: "urls"`
+	IntVals    []*IntVal     `json: "intvals"`
+	StringVals []*StringVal  `json: "stringvals"`
 }
 
 func NewURLRandomizer(seed int64, urls []string, intRanges []*IntVal, stringVals []*StringVal) *URLRandomizer {
@@ -69,13 +69,13 @@ func (u *URLRandomizer) subStrs(url string) string {
 	return url
 }
 
-func (u *URLRandomizer) GetChannel(numRequests int, quit chan bool) chan *url.URL {
+func (u *URLRandomizer) GetChannel(numRequests uint32, quit chan bool) chan *url.URL {
 	ch := make(chan *url.URL)
 	go func() {
 		defer close(ch)
 		count := 0
 		size := len(u.Urls)
-		for i := 0; i != numRequests; i++ {
+		for i := uint32(0); i != numRequests; i++ {
 			select {
 			case <-quit:
 				break
