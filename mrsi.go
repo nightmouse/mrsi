@@ -7,6 +7,7 @@ import (
 	"runtime"
     "github.com/codegangsta/cli"
     "encoding/json"
+    "io/ioutil"
 )
 
 
@@ -30,6 +31,7 @@ func runJson(c *cli.Context) {
     }
 
     runConf := &client.RunConf{}
+
     dec := json.NewDecoder(fd)
     err = dec.Decode(runConf)
     if err != nil { 
@@ -39,22 +41,30 @@ func runJson(c *cli.Context) {
     runConf.Exec()
 }
 
-func initJson(c *cli.Context) { 
+func initJson(c *cli.Context) {
     if len(c.Args()) != 1 { 
         fmt.Println("error: expecting one argument")
         os.Exit(1)
     }
 
 	fileName := c.Args()[0]
-	fd, err := os.Create(fileName)
-	defer fd.Close()
+
+	tmpUrls:= []string{"http://localhost:8080/{1}/{2}.html"}
+	tmpVals := []string{"index", "about", "contact"}
+	tmpIntVals := []*client.IntVal{ &client.IntVal{"{1}",0,42} }
+    tmpStrVals := []*client.StringVal{ &client.StringVal{"{2}", tmpVals}}
+    profile := client.RunConf{
+			uint32(100),
+			uint32(8),
+			client.URLRandomizer{ 0, tmpUrls, tmpIntVals, tmpStrVals }} 
+
+	bytes, err := json.MarshalIndent(profile, "", "   ")
 	if err != nil { 
-		fmt.Println("error initialing ", fileName, ": ", err)
+		fmt.Println("error encoding json: ", err)
 		os.Exit(1)
 	}
 
-	enc := json.NewEncoder(fd)
-	enc.Encode(client.RunConf{})
+	ioutil.WriteFile(fileName, bytes, 0644)
 
 	os.Exit(0)
 }
@@ -63,7 +73,6 @@ func main() {
     app := cli.NewApp()
     app.Name = "mrsi"
     app.Usage = "benchmarks http servers with configurable urls"
-    //app.Action = exec
     app.Commands = []cli.Command{ 
         {
             Name: "run",
@@ -72,7 +81,7 @@ func main() {
         },
         {
             Name: "init",
-            Usage: "Intialize a json file with an test profile",
+            Usage: "Intialize a .json file with a test profile",
             Action: initJson,
         },
     }
