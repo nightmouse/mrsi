@@ -1,31 +1,6 @@
 # mrsi
 
-
-https://en.wikipedia.org/wiki/Artillery#MRSI
-
-```
-./mrsi --help
-NAME:
-   mrsi - benchmarks http servers with configurable urls
-
-USAGE:
-   mrsi [global options] command [command options] [arguments...]
-   
-VERSION:
-   0.1.0
-   
-COMMANDS:
-   run		Run jobs defined in a .json file
-   init		Intialize a .json file with a test profile
-   test		test a given set of urls specified on the command line
-   help, h	Shows a list of commands or help for one command
-   
-GLOBAL OPTIONS:
-   --help, -h		show help
-   --version, -v	print the version
-
-
-```
+mrsi sends parallel requests to a http server and measures the response times while the sever is under load.  
 
 ## Example Usage
 
