@@ -1,127 +1,228 @@
-// https://en.wikipedia.org/wiki/Artillery#MRSI
-
 package main
 
 import (
-	"errors"
-	"flag"
+	"encoding/json"
 	"fmt"
+	"github.com/codegangsta/cli"
+	"github.com/nightmouse/mrsi/client"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"os"
-	"os/signal"
 	"runtime"
-	"time"
 )
 
-type result struct {
-	Duration time.Duration
-	Bytes    int64
-	Err      error
-}
-
-func worker(jobs chan *url.URL, results chan result) {
-	for {
-		select {
-		case url, ok := <-jobs:
-			if !ok {
-				return
-			}
-
-			start := time.Now()
-			resp, err := http.Get(url.String())
-
-			if err != nil {
-				results <- result{Err: err}
-				continue
-			}
-
-			defer resp.Body.Close()
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				err = errors.New("Server returned " + resp.Status)
-				results <- result{Err: err}
-				continue
-			}
-
-			bytes, _ := ioutil.ReadAll(resp.Body)
-			end := time.Now()
-			results <- result{Duration: end.Sub(start), Bytes: int64(len(bytes))}
-			fmt.Println("finished: ", url, " ", len(bytes))
-		}
-	}
-}
+var GlobalIntVals []*client.IntVal
+var GlobalStringVals []*client.StringVal
 
 func Init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	GlobalIntVals = make([]*client.IntVal,0)
+	GlobalStringVals = make([]*client.StringVal,0)
 }
 
-func TrapSigInt(quitChan chan bool) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		<-c
-		quitChan <- true
-		return
-	}()
+func runJson(c *cli.Context) {
+	fmt.Println("runJson: ", c.Args())
+	if len(c.Args()) != 1 {
+		fmt.Println("error: expecting one argument")
+		os.Exit(1)
+	}
+
+	fileName := c.Args()[0]
+	fd, err := os.Open(fileName)
+	defer fd.Close()
+	if err != nil {
+		fmt.Println("unable to open ", fileName, ": ", err)
+		os.Exit(1)
+	}
+
+	runConf := &client.RunConf{}
+
+	dec := json.NewDecoder(fd)
+	err = dec.Decode(runConf)
+	if err != nil {
+		fmt.Println("error parsing json in ", fileName, ": ", err)
+		os.Exit(1)
+	}
+	runConf.Exec()
 }
 
-var workerCount = flag.Int("n", 4, "number of worker threads each requesting the url")
-var requestCount = flag.Int("r", 1024, "total number of requests")
+func initJson(c *cli.Context) {
+	if len(c.Args()) != 1 {
+		fmt.Println("error: expecting one argument")
+		os.Exit(1)
+	}
+
+	fileName := c.Args()[0]
+
+	tmpUrls := []string{"http://localhost:8080/{1}/{2}.html"}
+	tmpVals := []string{"index", "about", "contact"}
+	tmpIntVals := []*client.IntVal{&client.IntVal{"{1}", 0, 42}}
+	tmpStrVals := []*client.StringVal{&client.StringVal{"{2}", tmpVals}}
+	profile := client.RunConf{
+		uint32(100),
+		uint32(8),
+		client.URLRandomizer{0, tmpUrls, tmpIntVals, tmpStrVals}}
+
+	bytes, err := json.MarshalIndent(profile, "", "   ")
+	if err != nil {
+		fmt.Println("error encoding json: ", err)
+		os.Exit(1)
+	}
+	err = ioutil.WriteFile(fileName, bytes, 0644)
+	if err != nil {
+		fmt.Println("error saving json to ", fileName, ": ", err)
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
+func parseIntVal(c *cli.Context) {
+	key := c.String("key")
+	if len(key) == 0 { 
+		fmt.Println("--key is required parameter")
+		os.Exit(1)
+	}
+	min := c.Int("min")
+	max := c.Int("max")
+	iv, err := client.NewIntVal(key, int64(min), int64(max))
+	if err != nil { 
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	GlobalIntVals = append(GlobalIntVals, iv)
+}
+
+func parseStrVal(c *cli.Context) {
+	key := c.String("key")
+	if len(key) == 0 { 
+		fmt.Println("--key is required parameter")
+		os.Exit(1)
+	}
+
+	vals := c.StringSlice("values")
+	if vals == nil || len(vals) == 0 { 
+		fmt.Println("no values specified")
+		os.Exit(1)
+	}
+
+	sv, err := client.NewStringVal(key, vals)
+	if err != nil { 
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	GlobalStringVals = append(GlobalStringVals, sv)
+}
+
+func runCli(c *cli.Context) {
+
+	// seed
+	seed := c.Int("seed")
+	// requests
+	requests := c.Int("requests")
+
+	// workers
+	workers := c.Int("workers")
+	if (workers < 1) { 
+		fmt.Println("workers flag must be a positive integer greater than zero")
+		os.Exit(1)
+	}
+
+	// urls
+	urls := c.StringSlice("urls")
+	if urls == nil || len(urls) == 0 { 
+		fmt.Println("no urls specified")
+		os.Exit(1)
+	}
+	
+	runConf := &client.RunConf{
+		uint32(workers),
+		uint32(requests),
+		client.URLRandomizer{
+			Seed: int64(seed),
+			Urls: urls},
+	}
+
+	runConf.Exec()
+}
 
 func main() {
-	flag.Parse()
+	app := cli.NewApp()
+	app.Name = "mrsi"
+	app.Version = "0.1.0"
+	app.Usage = "benchmarks http servers with configurable urls"
+	app.Commands = []cli.Command{
+		{
+			Name:   "run",
+			Usage:  "Run jobs defined in a .json file",
+			Action: runJson,
+		},
+		{
+			Name:   "init",
+			Usage:  "Intialize a .json file with a test profile",
+			Action: initJson,
+		},
+		{
+			Name:   "test",
+			Usage:  "test a given set of urls specified on the command line",
+			Action: runCli,
+			Flags:  []cli.Flag {
+				cli.IntFlag{
+					Name: "seed, s",
+					Value: 0,
+					Usage: "random number seed", },
 
-	quitChan := make(chan bool)
-	jobChan := make(chan *url.URL)
-	resultChan := make(chan result)
+				cli.IntFlag{
+					Name: "workers, w",
+					Value: 8,
+					Usage: "number of workers which may send parallel requests", },
 
-	TrapSigInt(quitChan)
+				cli.IntFlag{
+					Name: "requests, r",
+					Value: 100,
+					Usage: "total number of requests to send", },
 
-	// parse the urls
-	urls := make([]*url.URL, flag.NArg())
-	for i := 0; i != flag.NArg(); i++ {
-		u, err := url.Parse(flag.Arg(i))
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		urls[i] = u
+				cli.StringSliceFlag{
+					Name: "urls, u",
+					Usage: "", },
+			 },
+
+			 Subcommands: []cli.Command{
+			 	cli.Command { 
+					Name:   "strval",
+					Usage:  "defines a substitution randomly chosen from 'values' for key where 'key' may be in a url",
+					Action: parseStrVal,
+					Flags:  []cli.Flag {
+						cli.StringFlag{
+							Name: "key",
+							Value: "", },
+
+						cli.StringSliceFlag{
+							Name: "values", },
+					},
+
+				},
+			 	cli.Command { 
+					Name:   "intval",
+					Usage:  "defines a substitution between min and max for key, where 'key' may be in a url",
+					Action: parseIntVal,
+					Flags:  []cli.Flag {
+						cli.StringFlag{
+							Name: "key",
+							Value: "", },
+
+						cli.IntFlag{
+							Name: "min",
+							Value: 0, },
+
+						cli.IntFlag{
+							Name: "max",
+							Value: 100,},
+					},
+				},
+			 },
+		},
 	}
 
-	// start workers
-	for i := 0; i != (*workerCount); i++ {
-		go worker(jobChan, resultChan)
-	}
 
-	// distribute the jobs
-	go func() {
-		for i := 0; i != (*requestCount); i++ {
-			select {
-			case <-quitChan:
-				break
-			default:
-				jobChan <- urls[i%len(urls)]
-			}
-		}
-		close(jobChan)
-	}()
+	app.Run(os.Args)
 
-	// wait for results
-	totalTime := 0.0
-	totalBytes := int64(0)
-	totalErrors := 0
-	var totalResults int
-	for totalResults = 0; totalResults < (*requestCount); totalResults++ {
-		r := <-resultChan
-		totalResults++
-		if r.Err != nil {
-			totalErrors++
-			fmt.Println(r.Err)
-		} else {
-			totalTime += r.Duration.Seconds()
-			totalBytes += r.Bytes
-		}
-	}
-	fmt.Printf("%d requests %d errors %d byes %f seconds\n", totalResults, totalErrors, totalBytes, totalTime)
 }
