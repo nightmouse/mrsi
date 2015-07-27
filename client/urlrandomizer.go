@@ -17,7 +17,9 @@ type IntVal struct {
 }
 
 func NewIntVal(key string, min, max int64) (*IntVal, error) {
-	if min >= max {
+    if len(key) == 0 {
+        return nil, errors.New("key must have a length")
+	} else if min >= max {
 		return nil, errors.New("intval must have a min value less than max")
 	}
 	return &IntVal{key, min, max}, nil
@@ -28,12 +30,14 @@ type StringVal struct {
 	Vals []string `json: "values"`
 }
 
-func NewStringVal(key, vals string) (*StringVal, error) {
-	v := strings.Split(vals, ",")
-	if len(v) == 0 {
-		return nil, errors.New("no string values specified")
-	}
-	return &StringVal{key, v}, nil
+func NewStringVal(key string, vals []string) (*StringVal, error) {
+    if len(key) == 0 {
+        return nil, errors.New("key must have a length")
+    } else if len(vals) == 0 { 
+        return nil, errors.New("values must have a length")
+    }
+
+	return &StringVal{key, vals}, nil
 }
 
 type URLRandomizer struct {
