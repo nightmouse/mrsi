@@ -5,18 +5,33 @@ https://en.wikipedia.org/wiki/Artillery#MRSI
 
 ```
 ./mrsi --help
-Usage of ./mrsi:
-  -n=4: number of worker threads each requesting the url
-  -r=1024: total number of requests
-  intval
-    -key="": a token to replace in the url
-    -min=0: minimum number in a random range
-    -max=0: maximum number in a random range
-  strval
-    -key="": a token to replace in the url
-    -values="": a token to replace in the url
-  url1, url2...
+NAME:
+   mrsi - benchmarks http servers with configurable urls
 
-./mrsi -n 8 -r 100 intval -key="{1}" -min=0 -max=10  strval -key="{2}" -values="one,two,three" "http://localhost/{1}/{2}"  "http://localhost/items/id={1}"
+USAGE:
+   mrsi [global options] command [command options] [arguments...]
+   
+VERSION:
+   0.1.0
+   
+COMMANDS:
+   run		Run jobs defined in a .json file
+   init		Intialize a .json file with a test profile
+   test		test a given set of urls specified on the command line
+   help, h	Shows a list of commands or help for one command
+   
+GLOBAL OPTIONS:
+   --help, -h		show help
+   --version, -v	print the version
 
+
+```
+
+## Example Usage
+
+Run a test on the command line using 8 workers to send 100 requests to "http://localhost/items/id={1}"
+where _{1}_ is defined as a random number between 1 and 1024(includsive).
+
+```
+./mrsi test -w 8 -r 100  -u "http://localhost/items/id={1}" intval --key "{1}" --min 1 --max 1024
 ```
