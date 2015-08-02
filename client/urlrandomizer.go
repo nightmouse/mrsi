@@ -11,14 +11,14 @@ import (
 )
 
 type IntVal struct {
-	Key string `json: "key"`
-	Min int64  `json: "min"`
-	Max int64  `json: "max"`
+	Key string `json:"key"`
+	Min int64  `json:"min"`
+	Max int64  `json:"max"`
 }
 
 func NewIntVal(key string, min, max int64) (*IntVal, error) {
-    if len(key) == 0 {
-        return nil, errors.New("key must have a length")
+	if len(key) == 0 {
+		return nil, errors.New("key must have a length")
 	} else if min >= max {
 		return nil, errors.New("intval must have a min value less than max")
 	}
@@ -26,25 +26,25 @@ func NewIntVal(key string, min, max int64) (*IntVal, error) {
 }
 
 type StringVal struct {
-	Key  string   `json: "key"`
-	Vals []string `json: "values"`
+	Key  string   `json:"key"`
+	Vals []string `json:"values"`
 }
 
 func NewStringVal(key string, vals []string) (*StringVal, error) {
-    if len(key) == 0 {
-        return nil, errors.New("key must have a length")
-    } else if len(vals) == 0 { 
-        return nil, errors.New("values must have a length")
-    }
+	if len(key) == 0 {
+		return nil, errors.New("key must have a length")
+	} else if len(vals) == 0 {
+		return nil, errors.New("values must have a length")
+	}
 
 	return &StringVal{key, vals}, nil
 }
 
 type URLRandomizer struct {
-	Seed       int64        `json: "seed, omitempty"`
-	Urls       []string     `json: "urls"`
-	IntVals    []*IntVal    `json: "intvals"`
-	StringVals []*StringVal `json: "stringvals"`
+	Seed       int64        `json:"seed,omitempty"`
+	Urls       []string     `json:"urls"`
+	IntVals    []*IntVal    `json:"intvals"`
+	StringVals []*StringVal `json:"stringvals"`
 }
 
 func NewURLRandomizer(seed int64, urls []string, intRanges []*IntVal, stringVals []*StringVal) *URLRandomizer {

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -8,21 +9,67 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 )
 
-// a struct to handle json martialing
-// todo: add fields for results file, method
 type RunConf struct {
-	Requests uint32 `json: "requests"`
-	Workers  uint32 `json: "workers"`
-	URLRandomizer
+	Requests uint32            `json:"requests"`
+	Workers  uint32            `json:"workers"`
+	Method   string            `json:"method,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	*URLRandomizer
+	Body json.RawMessage `json:"body,omitempty,string"`
+	file string          `json:"file,omitempty"` // this is used for json only
 }
 
 type Result struct {
 	Duration time.Duration
 	Bytes    int64
 	Err      error
+}
+
+func NewRunConf(requests, workers uint32, method string, headers map[string]string, ur *URLRandomizer, requestBody []byte) (*RunConf, error) {
+	r := &RunConf{
+		requests,
+		workers,
+		method,
+		headers,
+		ur,
+		requestBody,
+		""}
+
+	if err := r.Check(); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (c *RunConf) Check() error {
+	var err error
+    
+	// make sure the method, the request body and file are set appropriately
+	c.Method = strings.ToUpper(c.Method)
+	switch c.Method {
+	case "GET", "DELETE", "HEAD":
+		if c.Body != nil {
+			err = errors.New("Can't specify a request body for " + c.Method)
+		}
+	case "PUT", "POST", "PATCH":
+		if len(c.file) == 0 && (c.Body == nil || len(c.Body) == 0) {
+			err = errors.New(c.Method + " requres a request body")
+		}
+
+		if len(c.file) != 0 {
+			c.Body, err = ioutil.ReadFile(c.file)
+		}
+
+	case "TRACE", "OPTIONS", "CONNECT":
+		err = errors.New(c.Method + " is not supported")
+	default:
+		err = errors.New("invalid method: " + c.Method)
+	}
+	return err
 }
 
 func (c *RunConf) worker(jobs chan *url.URL, results chan Result) {
@@ -70,11 +117,11 @@ func (c *RunConf) Exec() {
 
 	trapSigInt(quitChan)
 
-	jobChan := c.GetChannel(c.Requests, quitChan)
+	urlChan := c.GetChannel(c.Requests, quitChan)
 
 	// start workers
 	for i := uint32(0); i != c.Workers; i++ {
-		go c.worker(jobChan, resultChan)
+		go c.worker(urlChan, resultChan)
 	}
 
 	// wait for results
