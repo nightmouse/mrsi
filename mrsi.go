@@ -20,7 +20,6 @@ func Init() {
 }
 
 func runJson(c *cli.Context) {
-	fmt.Println("runJson: ", c.Args())
 	if len(c.Args()) != 1 {
 		fmt.Println("error: expecting one argument")
 		os.Exit(1)
@@ -43,11 +42,11 @@ func runJson(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	if err = runConf.Check(); err != nil { 
+	if err = runConf.Check(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
-    }
-    runConf.Exec()
+	}
+	runConf.Exec()
 }
 
 func initJson(c *cli.Context) {
@@ -143,11 +142,11 @@ func runCli(c *cli.Context) {
 
 	// body
 	body := c.String("body")
-    bodyBytes := []byte(body)
-    if bodyBytes == nil || len(bodyBytes) == 0 { 
+	bodyBytes := []byte(body)
+	if bodyBytes == nil || len(bodyBytes) == 0 {
 		fmt.Println("body flag has no value")
 		os.Exit(1)
-    }
+	}
 
 	// urls
 	urls := c.StringSlice("urls")

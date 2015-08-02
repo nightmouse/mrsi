@@ -20,7 +20,7 @@ type RunConf struct {
 	Headers  map[string]string `json:"headers,omitempty"`
 	*URLRandomizer
 	Body json.RawMessage `json:"body,omitempty,string"`
-	file string          `json:"file,omitempty"` // this is used for json only
+	File string          `json:"file,omitempty"` // this is used for json only
 }
 
 type Result struct {
@@ -47,7 +47,7 @@ func NewRunConf(requests, workers uint32, method string, headers map[string]stri
 
 func (c *RunConf) Check() error {
 	var err error
-    
+
 	// make sure the method, the request body and file are set appropriately
 	c.Method = strings.ToUpper(c.Method)
 	switch c.Method {
@@ -56,12 +56,12 @@ func (c *RunConf) Check() error {
 			err = errors.New("Can't specify a request body for " + c.Method)
 		}
 	case "PUT", "POST", "PATCH":
-		if len(c.file) == 0 && (c.Body == nil || len(c.Body) == 0) {
+		if len(c.File) == 0 && (c.Body == nil || len(c.Body) == 0) {
 			err = errors.New(c.Method + " requres a request body")
 		}
 
-		if len(c.file) != 0 {
-			c.Body, err = ioutil.ReadFile(c.file)
+		if len(c.File) != 0 {
+			c.Body, err = ioutil.ReadFile(c.File)
 		}
 
 	case "TRACE", "OPTIONS", "CONNECT":
@@ -97,7 +97,6 @@ func (c *RunConf) worker(jobs chan *url.URL, results chan Result) {
 		bytes, _ := ioutil.ReadAll(resp.Body)
 		end := time.Now()
 		results <- Result{Duration: end.Sub(start), Bytes: int64(len(bytes))}
-		fmt.Println("finished: ", url, " ", len(bytes))
 	}
 }
 
@@ -134,12 +133,11 @@ func (c *RunConf) Exec() {
 		totalResults++
 		if r.Err != nil {
 			totalErrors++
-			fmt.Println(r.Err)
 		} else {
 			totalTime += r.Duration.Seconds()
 			totalBytes += r.Bytes
 		}
 	}
-	fmt.Printf("%d requests %d errors %d byes %f seconds\n", totalResults, totalErrors, totalBytes, totalTime)
+	fmt.Printf("%d requests %d errors %d bytes %f seconds\n", totalResults, totalErrors, totalBytes, totalTime)
 	os.Exit(0)
 }
