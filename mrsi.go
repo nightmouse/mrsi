@@ -10,13 +10,13 @@ import (
 	"runtime"
 )
 
-var GlobalIntVals []*client.IntVal
-var GlobalStringVals []*client.StringVal
+var GlobalIntVars []*client.IntVar
+var GlobalStringVars []*client.StringVar
 
 func Init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	GlobalIntVals = make([]*client.IntVal, 0)
-	GlobalStringVals = make([]*client.StringVal, 0)
+	GlobalIntVars = make([]*client.IntVar, 0)
+	GlobalStringVars = make([]*client.StringVar, 0)
 }
 
 func runJson(c *cli.Context) {
@@ -59,14 +59,14 @@ func initJson(c *cli.Context) {
 
 	tmpUrls := []string{"http://localhost:8080/{1}/{2}.html"}
 	tmpVals := []string{"index", "about", "contact"}
-	tmpIntVals := []*client.IntVal{&client.IntVal{"{1}", 0, 42}}
-	tmpStrVals := []*client.StringVal{&client.StringVal{"{2}", tmpVals}}
+	tmpIntVars := []*client.IntVar{&client.IntVar{"{1}", 0, 42}}
+	tmpStrVals := []*client.StringVar{&client.StringVar{"{2}", tmpVals}}
 	profile, err := client.NewRunConf(
 		uint32(100),
 		uint32(8),
 		"GET",
 		map[string]string{"": ""},
-		&client.URLRandomizer{0, tmpUrls, tmpIntVals, tmpStrVals},
+		&client.URLRandomizer{0, tmpUrls, tmpIntVars, tmpStrVals},
 		nil)
 	if err != nil {
 		fmt.Println("this shouldn't happen")
@@ -86,7 +86,7 @@ func initJson(c *cli.Context) {
 	os.Exit(0)
 }
 
-func parseIntVal(c *cli.Context) {
+func parseIntVar(c *cli.Context) {
 	key := c.String("key")
 	if len(key) == 0 {
 		fmt.Println("--key is required parameter")
@@ -94,12 +94,12 @@ func parseIntVal(c *cli.Context) {
 	}
 	min := c.Int("min")
 	max := c.Int("max")
-	iv, err := client.NewIntVal(key, int64(min), int64(max))
+	iv, err := client.NewIntVar(key, int64(min), int64(max))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	GlobalIntVals = append(GlobalIntVals, iv)
+	GlobalIntVars = append(GlobalIntVars, iv)
 }
 
 func parseStrVal(c *cli.Context) {
@@ -115,12 +115,12 @@ func parseStrVal(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	sv, err := client.NewStringVal(key, vals)
+	sv, err := client.NewStringVar(key, vals)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	GlobalStringVals = append(GlobalStringVals, sv)
+	GlobalStringVars = append(GlobalStringVars, sv)
 }
 
 func runCli(c *cli.Context) {
@@ -161,8 +161,8 @@ func runCli(c *cli.Context) {
 		method,
 		map[string]string{"": ""},
 		&client.URLRandomizer{
-			IntVals:    GlobalIntVals,
-			StringVals: GlobalStringVals,
+			IntVars:    GlobalIntVars,
+			StringVars: GlobalStringVars,
 			Seed:       int64(seed),
 			Urls:       urls},
 		bodyBytes,
@@ -244,7 +244,7 @@ func main() {
 				cli.Command{
 					Name:   "intval",
 					Usage:  "defines a substitution between min and max for key, where 'key' may be in a url",
-					Action: parseIntVal,
+					Action: parseIntVar,
 					Flags: []cli.Flag{
 						cli.StringFlag{
 							Name:  "key",
