@@ -23,9 +23,15 @@ type RunConf struct {
 	File string          `json:"file,omitempty"` // this is used for json only
 }
 
-type Result struct {
+type Timing struct {
+	Category string
 	Duration time.Duration
-	Bytes    int64
+}
+
+type Result struct {
+	RequestNo uint64
+	Timings  []Timing
+	Bytes    uint64
 	Err      error
 }
 
@@ -96,7 +102,7 @@ func (c *RunConf) worker(jobs chan *url.URL, results chan Result) {
 
 		bytes, _ := ioutil.ReadAll(resp.Body)
 		end := time.Now()
-		results <- Result{Duration: end.Sub(start), Bytes: int64(len(bytes))}
+		results <- Result{Duration: end.Sub(start), Bytes: uint64(len(bytes))}
 	}
 }
 
@@ -115,7 +121,6 @@ func (c *RunConf) Exec() {
 	resultChan := make(chan Result)
 
 	trapSigInt(quitChan)
-
 	urlChan := c.GetChannel(c.Requests, quitChan)
 
 	// start workers
@@ -125,7 +130,7 @@ func (c *RunConf) Exec() {
 
 	// wait for results
 	totalTime := 0.0
-	totalBytes := int64(0)
+	totalBytes := uint64(0)
 	totalErrors := 0
 	var totalResults uint32
 	for totalResults = uint32(0); totalResults < c.Requests; totalResults++ {
